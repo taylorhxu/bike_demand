@@ -71,9 +71,11 @@ Two problems from the dissertation shape how this project is set up:
 
 ## 5. Why Oslo
 
-Beyond data quality, there is a personal reason: I am learning Norwegian and expect to move to Norway in
-the next few years. Working with Norwegian public data, and Norwegian place names and documentation, is
-part of that. It also makes the project useful to me beyond the modelling.
+I came across Oslo's data while looking for open bike-share records in Europe, and it stood out. Few
+European systems publish trip-level data at all; many large schemes publish only live availability or
+none. Oslo publishes every trip with station coordinates, a stable schema since 2019, records back to
+2016, a daily-updated current month, an explicit list of what is excluded, and an open licence. Bergen
+and Trondheim publish in the same format, which makes cross-city tests straightforward.
 
 ## 6. What success looks like
 
