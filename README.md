@@ -46,7 +46,7 @@ and how each is handled are in [docs/data-sources.md](docs/data-sources.md).
 ## Repository layout
 
 ```
-oslo-bike-demand/
+bike_demand/
 ├── contracts/               Data contracts: schema, keys, rules, licence per source
 ├── src/bikedemand/
 │   ├── contracts.py         Loads a contract and validates a DataFrame against it
