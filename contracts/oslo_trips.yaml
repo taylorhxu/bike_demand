@@ -1,0 +1,39 @@
+id: oslo_trips
+version: 1
+description: Oslo City Bike anonymised trip records, current format (April 2019 onwards).
+owner: Taylor Xu
+source:
+  publisher: Oslo City Bike (UIP Bauer Media Outdoor Norge AS)
+  docs: https://oslobysykkel.no/en/open-data/historical
+  url_template: https://data.urbansharing.com/oslobysykkel.no/trips/v1/{year}/{month:02d}.csv
+  update_frequency: daily for the current month, final after month end
+licence:
+  name: NLOD 2.0
+  url: https://data.norge.no/nlod/en/2.0
+  attribution: Contains data from Oslo City Bike, published under NLOD 2.0.
+retention: Raw files kept locally only; never committed.
+
+columns:
+  started_at:                {type: datetime, nullable: false, timezone: UTC}
+  ended_at:                  {type: datetime, nullable: false, timezone: UTC}
+  duration:                  {type: int, nullable: false, min: 60}
+  start_station_id:          {type: str, nullable: false}
+  start_station_name:        {type: str, nullable: false}
+  start_station_description: {type: str, nullable: true}
+  start_station_latitude:    {type: float, nullable: false, min: 59.0, max: 60.5}
+  start_station_longitude:   {type: float, nullable: false, min: 10.0, max: 11.5}
+  end_station_id:            {type: str, nullable: false}
+  end_station_name:          {type: str, nullable: false}
+  end_station_description:   {type: str, nullable: true}
+  end_station_latitude:      {type: float, nullable: false, min: 59.0, max: 60.5}
+  end_station_longitude:     {type: float, nullable: false, min: 10.0, max: 11.5}
+
+rules:
+  - name: ends_after_start
+    description: ended_at must not be before started_at.
+  - name: duration_matches_timestamps
+    description: duration should equal ended_at - started_at within 2 seconds.
+
+derived_columns:
+  started_at_local: started_at converted to Europe/Oslo
+  ended_at_local: ended_at converted to Europe/Oslo

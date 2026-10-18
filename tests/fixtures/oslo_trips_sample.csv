@@ -1,0 +1,5 @@
+started_at,ended_at,duration,start_station_id,start_station_name,start_station_description,start_station_latitude,start_station_longitude,end_station_id,end_station_name,end_station_description,end_station_latitude,end_station_longitude
+2026-09-01 05:01:12.345000+00:00,2026-09-01 05:11:12.345000+00:00,600,627,Skøyen Stasjon,ved stasjonen,59.9226729,10.6788129,623,7 Juni Plassen,ved Stortinget,59.9150596,10.7312715
+2026-09-01 06:30:00+00:00,2026-09-01 06:45:30+00:00,930,623,7 Juni Plassen,ved Stortinget,59.9150596,10.7312715,610,Sotahjørnet,,59.9099822,10.7914482
+2026-09-01 07:00:00+00:00,2026-09-01 07:00:30+00:00,30,610,Sotahjørnet,,59.9099822,10.7914482,627,Skøyen Stasjon,ved stasjonen,59.9226729,10.6788129
+2026-09-01 08:00:00+00:00,2026-09-01 08:20:00+00:00,1200,610,Sotahjørnet,,0.0,0.0,627,Skøyen Stasjon,ved stasjonen,59.9226729,10.6788129

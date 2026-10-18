@@ -1,0 +1,25 @@
+# Data is downloaded, never committed
+data/
+upload/
+*.parquet
+*.csv
+!tests/fixtures/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# Notebooks and editors
+.ipynb_checkpoints/
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets
+.env

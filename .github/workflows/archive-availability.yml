@@ -1,0 +1,49 @@
+# Snapshots Oslo City Bike station availability every 15 minutes and stores each snapshot as an
+# asset on a weekly GitHub pre-release (tag: availability-YYYY-Www). Nothing is committed to the repo,
+# so the commit history stays meaningful.
+#
+# GitHub may delay or skip scheduled runs under load, so expect occasional gaps. If gaps matter,
+# move this to a small scheduled job in your own cloud account writing to object storage.
+
+name: Archive Oslo availability
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: archive-availability
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OSLO_CLIENT_IDENTIFIER: taylorhxu-oslobikedemand
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Take snapshot
+        run: python -m bikedemand.ingest.oslo_availability
+      - name: Upload to weekly release
+        # Weekly, because a release holds at most 1,000 assets (96 snapshots a day x 7 = 672).
+        run: |
+          TAG="availability-$(date -u +%G-W%V)"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "$TAG" --prerelease \
+              --notes "Oslo City Bike station availability snapshots (NLOD 2.0). One Parquet file per snapshot."
+          mkdir -p upload
+          for f in data/availability/oslo/date=*/*.parquet; do
+            day=$(basename "$(dirname "$f")" | cut -d= -f2)
+            cp "$f" "upload/${day}_$(basename "$f")"
+          done
+          gh release upload "$TAG" upload/*.parquet --clobber
