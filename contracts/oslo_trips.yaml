@@ -1,5 +1,5 @@
 id: oslo_trips
-version: 1
+version: 2
 description: Oslo City Bike anonymised trip records, current format (April 2019 onwards).
 owner: Taylor Xu
 source:
@@ -16,7 +16,7 @@ retention: Raw files kept locally only; never committed.
 columns:
   started_at:                {type: datetime, nullable: false, timezone: UTC}
   ended_at:                  {type: datetime, nullable: false, timezone: UTC}
-  duration:                  {type: int, nullable: false, min: 60}
+  duration:                  {type: int, nullable: false, min: 1}
   start_station_id:          {type: str, nullable: false}
   start_station_name:        {type: str, nullable: false}
   start_station_description: {type: str, nullable: true}
@@ -33,6 +33,11 @@ rules:
     description: ended_at must not be before started_at.
   - name: duration_matches_timestamps
     description: duration should equal ended_at - started_at within 2 seconds.
+  - name: short_trip
+    description: >-
+      Flag (not reject) trips under 60 s. The publisher documents a one-minute minimum, but
+      September 2026 contained 92 genuine 25-59 s trips between neighbouring stations (0.06%).
+      Version 1 of this contract rejected them.
 
 derived_columns:
   started_at_local: started_at converted to Europe/Oslo

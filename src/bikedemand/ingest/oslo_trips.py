@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 URL_TEMPLATE = "https://data.urbansharing.com/oslobysykkel.no/trips/v1/{year}/{month:02d}.csv"
 FIRST_MONTH = (2019, 4)
 LOCAL_TZ = "Europe/Oslo"
+SHORT_TRIP_SECONDS = 60
 
 STRING_COLS = [
     "start_station_id",
@@ -89,6 +90,9 @@ def apply_rules(df: pl.DataFrame) -> pl.DataFrame:
             (pl.col("ended_at") - pl.col("started_at")).dt.total_seconds() - pl.col("duration")
         ).abs()
         > 2,
+        # Oslo's docs say trips under a minute are excluded, but the files contain some genuine
+        # 25-59 s hops between neighbouring stations. Keep them, but flag them.
+        flag_short_trip=pl.col("duration") < SHORT_TRIP_SECONDS,
     )
 
 
@@ -116,6 +120,7 @@ def ingest_month(year: int, month: int, client: httpx.Client, data_dir: Path = D
         "quarantined": quarantined.height,
         "ends_before_start": int(valid["flag_ends_before_start"].sum()),
         "duration_mismatch": int(valid["flag_duration_mismatch"].sum()),
+        "short_trips": int(valid["flag_short_trip"].sum()),
     }
     log.info(report)
     return report

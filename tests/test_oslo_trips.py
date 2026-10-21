@@ -31,10 +31,17 @@ def test_station_ids_stay_strings(trips):
 def test_contract_quarantines_bad_rows_instead_of_failing(trips):
     contract = Contract.load("oslo_trips")
     valid, quarantined = contract.split(trips)
-    # Row 3 is under 60 s; row 4 has 0,0 coordinates.
-    assert valid.height == 2
-    assert quarantined.height == 2
+    # Row 4 has 0,0 coordinates.
+    assert valid.height == 3
+    assert quarantined.height == 1
     assert contract.validate(valid) == []
+
+
+def test_short_trips_are_kept_and_flagged(trips):
+    valid, _ = Contract.load("oslo_trips").split(trips)
+    short = valid.filter(pl.col("flag_short_trip"))
+    assert short.height == 1
+    assert short["duration"][0] == 30
 
 
 def test_contract_reports_missing_columns(trips):
