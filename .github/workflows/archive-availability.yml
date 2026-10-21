@@ -1,16 +1,28 @@
-# Snapshots Oslo City Bike station availability every 15 minutes and stores each snapshot as an
-# asset on a weekly GitHub pre-release (tag: availability-YYYY-Www). Nothing is committed to the repo,
-# so the commit history stays meaningful.
+# Archives Oslo City Bike station availability every 5 minutes.
 #
-# GitHub may delay or skip scheduled runs under load, so expect occasional gaps. If gaps matter,
-# move this to a small scheduled job in your own cloud account writing to object storage.
+# Why a long-running loop rather than a 15-minute cron: GitHub throttles scheduled workflows on
+# small repositories. The original */15 schedule produced about 6 runs a day instead of 96.
+# Now each run stays alive for up to ~5h40m and snapshots every 5 minutes. The schedule only
+# has to start a new run occasionally; with `cancel-in-progress: false`, one run waits in the
+# queue while another is active and starts as soon as it finishes, so coverage is near-continuous.
+#
+# Output: each run uploads one bundled Parquet file (status_<run start>.parquet), refreshed after
+# every snapshot, plus the station list, to a weekly pre-release (tag availability-YYYY-Www).
+# Nothing is committed to the repository.
 
 name: Archive Oslo availability
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
+    inputs:
+      minutes:
+        description: "How long to keep snapshotting (minutes)"
+        default: "340"
+      interval:
+        description: "Seconds between snapshots"
+        default: "300"
 
 permissions:
   contents: write
@@ -20,30 +32,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  snapshot:
+  archive:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 355
     env:
       OSLO_CLIENT_IDENTIFIER: taylorhxu-oslobikedemand
       GH_TOKEN: ${{ github.token }}
+      MINUTES: ${{ inputs.minutes || '340' }}
+      INTERVAL: ${{ inputs.interval || '300' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -e .
-      - name: Take snapshot
-        run: python -m bikedemand.ingest.oslo_availability
-      - name: Upload to weekly release
-        # Weekly, because a release holds at most 1,000 assets (96 snapshots a day x 7 = 672).
+      - name: Snapshot loop
         run: |
+          RUN=$(date -u +%Y-%m-%dT%H%MZ)
           TAG="availability-$(date -u +%G-W%V)"
+          END=$(( $(date +%s) + MINUTES * 60 ))
           gh release view "$TAG" >/dev/null 2>&1 || \
             gh release create "$TAG" --title "$TAG" --prerelease \
-              --notes "Oslo City Bike station availability snapshots (NLOD 2.0). One Parquet file per snapshot."
-          mkdir -p upload
-          for f in data/availability/oslo/date=*/*.parquet; do
-            day=$(basename "$(dirname "$f")" | cut -d= -f2)
-            cp "$f" "upload/${day}_$(basename "$f")"
+              --notes "Oslo City Bike station availability snapshots (NLOD 2.0). One bundled Parquet file per archiver run; snapshots every 5 minutes."
+          n=0
+          while :; do
+            if python -m bikedemand.ingest.oslo_availability snapshot; then
+              n=$((n + 1))
+              python -m bikedemand.ingest.oslo_availability bundle --out "upload/status_${RUN}.parquet"
+              if [ "$n" -eq 1 ]; then
+                cp data/availability/oslo/date=*/stations.parquet "upload/stations_${RUN}.parquet" 2>/dev/null || true
+                gh release upload "$TAG" "upload/stations_${RUN}.parquet" --clobber || true
+              fi
+              gh release upload "$TAG" "upload/status_${RUN}.parquet" --clobber || echo "upload failed; will retry next round"
+            else
+              echo "snapshot failed at $(date -u +%H:%M:%S); continuing"
+            fi
+            [ "$(date +%s)" -ge "$END" ] && break
+            sleep "$INTERVAL"
           done
-          gh release upload "$TAG" upload/*.parquet --clobber
+          echo "Finished: $n snapshots in run $RUN"

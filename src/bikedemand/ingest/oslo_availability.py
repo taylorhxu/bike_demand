@@ -1,8 +1,12 @@
 """Archive Oslo City Bike real-time station availability (GBFS).
 
 Historical availability isn't published, so this script takes snapshots of station_status and
-writes each as a small Parquet file. Run it on a schedule (see
-.github/workflows/archive-availability.yml) to build a record of empty and full docks over time.
+writes each as a small Parquet file. The workflow in .github/workflows/archive-availability.yml
+runs it in a loop and uploads a bundled file per run, building a record of empty and full docks.
+
+Usage:
+    python -m bikedemand.ingest.oslo_availability                 # one snapshot
+    python -m bikedemand.ingest.oslo_availability bundle --out x.parquet
 
 Output layout (git-ignored):
     data/availability/oslo/date={YYYY-MM-DD}/status_{HHMMSS}.parquet
@@ -11,6 +15,7 @@ Output layout (git-ignored):
 
 from __future__ import annotations
 
+import argparse
 import logging
 import os
 from datetime import UTC, datetime
@@ -70,6 +75,39 @@ def snapshot(data_dir: Path = DATA_DIR, now: datetime | None = None) -> Path:
     return out
 
 
-if __name__ == "__main__":
+def bundle(out: Path, data_dir: Path = DATA_DIR, pattern: str = "status_*.parquet") -> int:
+    """Concatenate all status snapshots under data_dir into one Parquet file; return row count.
+
+    The archiver workflow takes many snapshots in one run and uploads a single bundled file per
+    run, which keeps the release asset count far below GitHub's 1,000-per-release limit.
+    """
+    files = sorted((data_dir / "availability" / "oslo").glob(f"date=*/{pattern}"))
+    if not files:
+        return 0
+    df = pl.concat([pl.read_parquet(f) for f in files], how="diagonal_relaxed").sort(
+        "snapshot_at", "station_id"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    df.write_parquet(out)
+    return df.height
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Oslo City Bike availability archiver")
+    sub = parser.add_subparsers(dest="cmd")
+    sub.add_parser("snapshot", help="Take one snapshot (default)")
+    b = sub.add_parser("bundle", help="Combine local snapshots into one Parquet file")
+    b.add_argument("--out", type=Path, required=True)
+    b.add_argument("--pattern", default="status_*.parquet")
+    args = parser.parse_args(argv)
+
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    snapshot()
+    if args.cmd == "bundle":
+        rows = bundle(args.out, pattern=args.pattern)
+        log.info("bundled %s rows into %s", rows, args.out)
+    else:
+        snapshot()
+
+
+if __name__ == "__main__":
+    main()
