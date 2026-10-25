@@ -44,6 +44,29 @@ The 92 short trips (25–59 s) are genuine hops between neighbouring stations, s
 Aker Brygge 2 and Vippetangen vest → øst, despite the documented one-minute minimum. Contract v2 keeps
 them and marks them with `flag_short_trip`, so analyses can include or exclude them deliberately.
 
+## Station dimension: first real-data run (April–September 2026)
+
+Run in CI on 25 October 2026 (`Real-data check` workflow), building the station dimension from six
+months of trips (916,680 rows ingested under contract v2; 1 row quarantined, in July, not yet
+inspected):
+
+| Measure | Value |
+|---|---|
+| Stations seen | 270 |
+| Versions | 270 |
+| Stations renamed or moved > 50 m | 0 |
+
+No station changed name or moved in these six months. That is either a genuinely stable network over
+one season, or a sign that the trip files carry each station's *current* attributes rather than the
+attributes at trip time, in which case trips alone cannot recover the station history. This run
+cannot tell the two apart. Next check: once this workflow is on `main`, run it manually over the full April 2019 → present
+range (`workflow_dispatch` only works for workflows on the default branch), where some
+renames and moves are almost certain; if that also finds none, use archived GBFS station information
+and the legacy mapping files as the history source instead.
+
+The first observed day is 31 March 2026: trips starting just after local midnight on 1 April fall on
+31 March in UTC, as expected from the midnight-UTC file cut.
+
 ## Known issues and how they are handled
 
 | Issue | Effect on modelling | Handling |
