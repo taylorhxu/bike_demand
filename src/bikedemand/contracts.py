@@ -15,6 +15,7 @@ _TYPE_CHECKS = {
     "int": lambda dt: dt.is_integer(),
     "float": lambda dt: dt.is_float(),
     "str": lambda dt: dt == pl.String,
+    "date": lambda dt: dt == pl.Date,
 }
 
 
@@ -41,6 +42,12 @@ class Contract:
         missing = set(self.columns) - set(df.columns)
         if missing:
             errors.append(f"missing columns: {sorted(missing)}")
+
+        key = self.raw.get("primary_key")
+        if key and not set(key) & missing:
+            dupes = df.height - df.select(key).unique().height
+            if dupes:
+                errors.append(f"primary key {key}: {dupes} duplicate rows")
 
         for name, spec in self.columns.items():
             if name not in df.columns:

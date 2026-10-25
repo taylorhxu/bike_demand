@@ -1,0 +1,43 @@
+# Runs the pipeline against real published data. The development workspace can't reach the
+# operators' servers, so changes are built against fixtures and checked against real files here.
+#
+# Currently: ingest a range of Oslo trip months under the oslo_trips contract, then build the
+# time-versioned station dimension from them. The station report goes to the job summary.
+
+name: Real-data check
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "contracts/**"
+      - ".github/workflows/real-data-check.yml"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "First month, YYYY-MM"
+        default: "2026-04"
+      end:
+        description: "Last month, YYYY-MM"
+        default: "2026-09"
+
+permissions:
+  contents: read
+
+jobs:
+  oslo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      START: ${{ inputs.start || '2026-04' }}
+      END: ${{ inputs.end || '2026-09' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Ingest Oslo trips
+        run: python -m bikedemand.ingest.oslo_trips --start "$START" --end "$END"
+      - name: Build station dimension
+        run: python -m bikedemand.stations --start "$START" --end "$END" --summary "$GITHUB_STEP_SUMMARY"

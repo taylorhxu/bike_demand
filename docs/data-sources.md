@@ -10,6 +10,7 @@ issues that affect modelling. Each source also has a machine-readable contract i
 | `oslo_trips` | Oslo City Bike historical trips, April 2019 → present | Monthly CSV/JSON from `data.urbansharing.com` | NLOD 2.0 | Oslo City Bike / UIP Bauer Media Outdoor Norge AS | `contracts/oslo_trips.yaml` |
 | `oslo_trips_legacy` | Oslo City Bike trips, April 2016 → December 2018 (older format) | Monthly zipped CSV/JSON from `data-legacy.urbansharing.com`, plus station location and ID mapping files | NLOD 2.0 | As above | planned |
 | `oslo_availability` | Oslo City Bike real-time station status (GBFS), archived by this repo | `gbfs.urbansharing.com`, `Client-Identifier` header required; snapshots every 5 min, bundled per run in weekly GitHub pre-releases | NLOD 2.0 | As above | planned |
+| `oslo_stations` | Time-versioned station dimension derived from `oslo_trips` (not a download) | Built by `bikedemand.stations` | NLOD 2.0 | As above | `contracts/oslo_stations.yaml` |
 | `london_trips` | TfL Santander Cycles journeys, September 2015 → latest week | Weekly CSV files from `cycling.data.tfl.gov.uk` | TfL open data terms | "Powered by TfL Open Data" | planned |
 
 Raw files are never committed. Only code, contracts, small test fixtures and derived summary outputs are.
@@ -52,7 +53,7 @@ them and marks them with `flag_short_trip`, so analyses can include or exclude t
 | Opening hours | Zeros between 01:00 and 05:00 are structural, not low demand | Mask closed hours in training and evaluation |
 | Legacy winter gaps | 2016–2018 files have no January–February | Treat 2016–18 as a separate regime; core models use April 2019+ |
 | COVID (2020–2021) | Behaviour shift (fewer commutes, more leisure) | Flag as a regime; test whether models trained before, during or after transfer |
-| Station network changes | The graph's nodes change over time | Time-versioned station dimension (valid-from / valid-to), built from trip data and GBFS |
+| Station network changes | The graph's nodes change over time | Time-versioned station dimension (valid-from / valid-to). Built from April 2019+ trip data so far: per UTC day the most common name and coordinates are taken, and a rename or a move over 50 m starts a new version. Not yet built: legacy years and the GBFS cross-check. Checked against real 2026 months by the `Real-data check` workflow |
 | Legacy station IDs | Different identifiers before 2019 | Use the operator's legacy-to-new mapping file |
 | Trips under 60 s | A handful per month despite the documented minimum | Kept and flagged (`flag_short_trip`), contract v2 |
 | Archived availability gaps | 18–21 Oct 2026: GitHub ran the 15-minute schedule only ~6 times a day, leaving gaps of several hours | Archiver changed on 21 Oct 2026 to long-running 5-minute loops; treat earlier data as sparse |
