@@ -1,0 +1,42 @@
+id: oslo_stations
+version: 1
+description: >-
+  Time-versioned Oslo City Bike station dimension, derived from current-format trip records
+  (oslo_trips). One row per station version; a new version starts when a station is renamed or
+  moves more than the move threshold (default 50 m).
+owner: Taylor Xu
+source:
+  derived_from: [oslo_trips]
+  builder: src/bikedemand/stations.py
+licence:
+  name: NLOD 2.0
+  url: https://data.norge.no/nlod/en/2.0
+  attribution: Contains data from Oslo City Bike, published under NLOD 2.0.
+retention: Derived locally; never committed.
+
+primary_key: [station_id, version]
+
+columns:
+  station_id:    {type: str, nullable: false}
+  version:       {type: int, nullable: false, min: 1}
+  name:          {type: str, nullable: false}
+  description:   {type: str, nullable: true}
+  latitude:      {type: float, nullable: false, min: 59.0, max: 60.5}
+  longitude:     {type: float, nullable: false, min: 10.0, max: 11.5}
+  valid_from:    {type: date, nullable: false}
+  valid_to:      {type: date, nullable: true}
+  first_seen:    {type: date, nullable: false}
+  last_seen:     {type: date, nullable: false}
+  days_seen:     {type: int, nullable: false, min: 1}
+  appearances:   {type: int, nullable: false, min: 1}
+  change_reason: {type: str, nullable: false}
+
+rules:
+  - name: windows_do_not_overlap
+    description: >-
+      For each station, valid_to of a version equals valid_from of the next; only the latest
+      version has a null valid_to. Days are UTC dates, matching the trip files' midnight-UTC cut.
+  - name: version_reason
+    description: >-
+      change_reason is first_seen for version 1 (first day in the input range, not necessarily the
+      day the station opened), otherwise renamed, moved or renamed_and_moved.

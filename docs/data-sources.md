@@ -10,6 +10,7 @@ issues that affect modelling. Each source also has a machine-readable contract i
 | `oslo_trips` | Oslo City Bike historical trips, April 2019 → present | Monthly CSV/JSON from `data.urbansharing.com` | NLOD 2.0 | Oslo City Bike / UIP Bauer Media Outdoor Norge AS | `contracts/oslo_trips.yaml` |
 | `oslo_trips_legacy` | Oslo City Bike trips, April 2016 → December 2018 (older format) | Monthly zipped CSV/JSON from `data-legacy.urbansharing.com`, plus station location and ID mapping files | NLOD 2.0 | As above | planned |
 | `oslo_availability` | Oslo City Bike real-time station status (GBFS), archived by this repo | `gbfs.urbansharing.com`, `Client-Identifier` header required; snapshots every 5 min, bundled per run in weekly GitHub pre-releases | NLOD 2.0 | As above | planned |
+| `oslo_stations` | Time-versioned station dimension derived from `oslo_trips` (not a download) | Built by `bikedemand.stations` | NLOD 2.0 | As above | `contracts/oslo_stations.yaml` |
 | `london_trips` | TfL Santander Cycles journeys, September 2015 → latest week | Weekly CSV files from `cycling.data.tfl.gov.uk` | TfL open data terms | "Powered by TfL Open Data" | planned |
 
 Raw files are never committed. Only code, contracts, small test fixtures and derived summary outputs are.
@@ -43,6 +44,29 @@ The 92 short trips (25–59 s) are genuine hops between neighbouring stations, s
 Aker Brygge 2 and Vippetangen vest → øst, despite the documented one-minute minimum. Contract v2 keeps
 them and marks them with `flag_short_trip`, so analyses can include or exclude them deliberately.
 
+## Station dimension: first real-data run (April–September 2026)
+
+Run in CI on 25 October 2026 (`Real-data check` workflow), building the station dimension from six
+months of trips (916,680 rows ingested under contract v2; 1 row quarantined, in July, not yet
+inspected):
+
+| Measure | Value |
+|---|---|
+| Stations seen | 270 |
+| Versions | 270 |
+| Stations renamed or moved > 50 m | 0 |
+
+No station changed name or moved in these six months. That is either a genuinely stable network over
+one season, or a sign that the trip files carry each station's *current* attributes rather than the
+attributes at trip time, in which case trips alone cannot recover the station history. This run
+cannot tell the two apart. Next check: once this workflow is on `main`, run it manually over the full April 2019 → present
+range (`workflow_dispatch` only works for workflows on the default branch), where some
+renames and moves are almost certain; if that also finds none, use archived GBFS station information
+and the legacy mapping files as the history source instead.
+
+The first observed day is 31 March 2026: trips starting just after local midnight on 1 April fall on
+31 March in UTC, as expected from the midnight-UTC file cut.
+
 ## Known issues and how they are handled
 
 | Issue | Effect on modelling | Handling |
@@ -52,7 +76,7 @@ them and marks them with `flag_short_trip`, so analyses can include or exclude t
 | Opening hours | Zeros between 01:00 and 05:00 are structural, not low demand | Mask closed hours in training and evaluation |
 | Legacy winter gaps | 2016–2018 files have no January–February | Treat 2016–18 as a separate regime; core models use April 2019+ |
 | COVID (2020–2021) | Behaviour shift (fewer commutes, more leisure) | Flag as a regime; test whether models trained before, during or after transfer |
-| Station network changes | The graph's nodes change over time | Time-versioned station dimension (valid-from / valid-to), built from trip data and GBFS |
+| Station network changes | The graph's nodes change over time | Time-versioned station dimension (valid-from / valid-to). Built from April 2019+ trip data so far: per UTC day the most common name and coordinates are taken, and a rename or a move over 50 m starts a new version. Not yet built: legacy years and the GBFS cross-check. Checked against real 2026 months by the `Real-data check` workflow |
 | Legacy station IDs | Different identifiers before 2019 | Use the operator's legacy-to-new mapping file |
 | Trips under 60 s | A handful per month despite the documented minimum | Kept and flagged (`flag_short_trip`), contract v2 |
 | Archived availability gaps | 18–21 Oct 2026: GitHub ran the 15-minute schedule only ~6 times a day, leaving gaps of several hours | Archiver changed on 21 Oct 2026 to long-running 5-minute loops; treat earlier data as sparse |

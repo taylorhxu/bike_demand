@@ -50,12 +50,13 @@ bike_demand/
 ├── contracts/               Data contracts: schema, keys, rules, licence per source
 ├── src/bikedemand/
 │   ├── contracts.py         Loads a contract and validates a DataFrame against it
+│   ├── stations.py          Time-versioned station dimension built from trips
 │   └── ingest/
 │       ├── oslo_trips.py         Monthly trip files → validated Parquet
 │       └── oslo_availability.py  GBFS station-status snapshot archiver
 ├── tests/                   Contract and parsing tests on small fixtures
 ├── docs/                    Motivation, data sources, roadmap
-└── .github/workflows/       CI, and the scheduled availability archiver
+└── .github/workflows/       CI, a real-data check, and the scheduled availability archiver
 ```
 
 ## Quick start
@@ -67,6 +68,9 @@ pytest
 
 # Download and validate Oslo trips for a range of months
 python -m bikedemand.ingest.oslo_trips --start 2019-04 --end 2026-09
+
+# Build the time-versioned station dimension from the ingested months
+python -m bikedemand.stations --start 2019-04 --end 2026-09
 
 # Take one availability snapshot (the scheduled workflow does this every 15 minutes)
 python -m bikedemand.ingest.oslo_availability
