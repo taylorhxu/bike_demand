@@ -1,0 +1,74 @@
+# Checks the legacy (2016-18) Oslo trip parser against the real published files.
+#
+# The legacy headers, timestamp format and time zone are not documented, and the development workspace
+# cannot reach data-legacy.urbansharing.com, so this is where the parser meets real data. The first step
+# writes the raw headers and sample rows to the job summary *before* parsing, so even a failed run shows
+# what the files actually contain. Nothing is committed or uploaded.
+
+name: Real-data check (Oslo legacy trips)
+
+on:
+  pull_request:
+    paths:
+      - "src/bikedemand/ingest/oslo_trips_legacy.py"
+      - "contracts/oslo_trips_legacy.yaml"
+      - ".github/workflows/real-data-check-legacy.yml"
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "First month, YYYY-MM (2016-04 or later)"
+        default: "2018-09"
+      end:
+        description: "Last month, YYYY-MM (2018-12 or earlier)"
+        default: "2018-10"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      START: ${{ inputs.start || '2018-09' }}
+      END: ${{ inputs.end || '2018-10' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      - name: Show raw headers and sample rows
+        run: |
+          python - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import io, zipfile, httpx
+          base = "https://data-legacy.urbansharing.com"
+          urls = [
+              f"{base}/legacy_new_station_id_mapping.csv",
+              f"{base}/legacy_station_locations.csv",
+              f"{base}/oslobysykkel.no/2016/04.csv.zip",
+              f"{base}/oslobysykkel.no/2018/10.csv.zip",
+          ]
+          print("## Raw legacy files (first lines)\n")
+          with httpx.Client(headers={"User-Agent": "taylorhxu-oslobikedemand"}, timeout=120) as c:
+              for url in urls:
+                  r = c.get(url)
+                  print(f"### {url} (HTTP {r.status_code}, {len(r.content):,} bytes)\n")
+                  if r.status_code != 200:
+                      continue
+                  data = r.content
+                  if url.endswith(".zip"):
+                      zf = zipfile.ZipFile(io.BytesIO(data))
+                      print(f"zip members: {zf.namelist()}\n")
+                      data = zf.read([n for n in zf.namelist() if n.lower().endswith(".csv")][0])
+                  head = data.decode("utf-8", errors="replace").splitlines()[:6]
+                  print("```\n" + "\n".join(head) + "\n```\n")
+          EOF
+
+      - name: Ingest legacy months under the contract
+        run: python -m bikedemand.ingest.oslo_trips_legacy --start "$START" --end "$END" --summary report.md
+
+      - name: Write report to job summary
+        if: always()
+        run: test -f report.md && cat report.md >> "$GITHUB_STEP_SUMMARY" || echo "No report (ingestion failed; see raw headers above)." >> "$GITHUB_STEP_SUMMARY"
