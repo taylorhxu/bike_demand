@@ -52,6 +52,7 @@ bike_demand/
 │   ├── contracts.py         Loads a contract and validates a DataFrame against it
 │   └── ingest/
 │       ├── oslo_trips.py         Monthly trip files → validated Parquet
+│       ├── oslo_trips_legacy.py  2016–18 legacy trip files + station ID mapping → Parquet
 │       └── oslo_availability.py  GBFS station-status snapshot archiver
 ├── tests/                   Contract and parsing tests on small fixtures
 ├── docs/                    Motivation, data sources, roadmap
@@ -67,6 +68,9 @@ pytest
 
 # Download and validate Oslo trips for a range of months
 python -m bikedemand.ingest.oslo_trips --start 2019-04 --end 2026-09
+
+# Legacy 2016–18 trips, with station IDs mapped to the current system
+python -m bikedemand.ingest.oslo_trips_legacy --start 2016-04 --end 2018-12
 
 # Take one availability snapshot (the scheduled workflow does this every 15 minutes)
 python -m bikedemand.ingest.oslo_availability

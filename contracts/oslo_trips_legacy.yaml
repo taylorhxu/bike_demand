@@ -1,0 +1,56 @@
+id: oslo_trips_legacy
+version: 1
+description: >-
+  Oslo City Bike trip records in the legacy format (April 2016 - December 2018), with station IDs
+  mapped to the current system where the operator's mapping file allows.
+owner: Taylor Xu
+source:
+  publisher: Oslo City Bike (UIP Bauer Media Outdoor Norge AS)
+  docs: https://oslobysykkel.no/en/apne-data/historisk
+  url_template: https://data-legacy.urbansharing.com/oslobysykkel.no/{year}/{month:02d}.csv.zip
+  companion_files:
+    station_locations: https://data-legacy.urbansharing.com/legacy_station_locations.csv
+    station_id_mapping: https://data-legacy.urbansharing.com/legacy_new_station_id_mapping.csv
+  published_months: 2016-04..2016-12, 2017-04..2017-12, 2018-03..2018-12 (winter closures)
+  update_frequency: static archive
+licence:
+  name: NLOD 2.0
+  url: https://data.norge.no/nlod/en/2.0
+  attribution: Contains data from Oslo City Bike, published under NLOD 2.0.
+retention: Raw files kept locally only; never committed.
+
+columns:
+  started_at:              {type: datetime, nullable: false, timezone: UTC}
+  ended_at:                {type: datetime, nullable: false, timezone: UTC}
+  duration:                {type: int, nullable: false, min: 0}
+  start_station_legacy_id: {type: str, nullable: false}
+  end_station_legacy_id:   {type: str, nullable: false}
+  start_station_id:        {type: str, nullable: true}
+  end_station_id:          {type: str, nullable: true}
+
+rules:
+  - name: timestamp_basis
+    description: >-
+      The publisher does not document the legacy time zone. Timestamps with a UTC offset are used as
+      given; timestamps without one are read as Europe/Oslo wall-clock time. Each run reports the basis
+      and a closed-hours check (share of starts 01:00-05:00 local under both readings).
+  - name: ends_after_start
+    description: >-
+      duration is derived (ended_at - started_at); there is no published duration column. Rows with a
+      negative duration, or with a timestamp that cannot be parsed or does not exist in local time
+      (spring-forward hour), are quarantined.
+  - name: ambiguous_local_time
+    description: >-
+      Flag (flag_ambiguous_local_time) trips in the autumn fall-back hour, read as the earlier (summer
+      time) instant. Only applies when the basis is assumed_local.
+  - name: short_trip
+    description: Flag (not reject) trips under 60 s, as in oslo_trips v2.
+  - name: station_mapping
+    description: >-
+      start/end_station_id come from the operator's legacy-to-new mapping. Unmapped stations are kept with
+      a null new ID and flagged (flag_unmapped_station). Legacy IDs that map to more than one new ID are
+      treated as unmapped rather than guessed.
+
+derived_columns:
+  started_at_local: started_at converted to Europe/Oslo
+  ended_at_local: ended_at converted to Europe/Oslo
