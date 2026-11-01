@@ -41,7 +41,7 @@ jobs:
 
       - name: Show raw headers and sample rows
         run: |
-          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          python - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
           import io, zipfile, httpx
           base = "https://data-legacy.urbansharing.com"
           urls = [

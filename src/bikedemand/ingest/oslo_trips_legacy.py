@@ -67,8 +67,8 @@ MAPPING_ALIASES = {
     "new_id": ["new_id", "new_station_id"],
 }
 LOCATION_ALIASES = {
+    # The real file (checked in CI, 1 Nov 2026) has legacy_id, latitude, longitude and no station name.
     "legacy_id": ["legacy_id", "legacy_station_id", "station_id", "id"],
-    "name": ["name", "title", "station_name"],
     "latitude": ["latitude", "lat"],
     "longitude": ["longitude", "lon", "lng"],
 }
@@ -202,11 +202,11 @@ def load_station_mapping(mapping_csv: bytes) -> tuple[pl.DataFrame, list[str]]:
 
 
 def load_station_locations(locations_csv: bytes) -> pl.DataFrame:
-    """Legacy station table: legacy_id, name, latitude, longitude."""
+    """Legacy station table: legacy_id, latitude, longitude."""
     raw = pl.read_csv(io.BytesIO(locations_csv), infer_schema=False)
     loc = resolve_columns(raw, LOCATION_ALIASES, "legacy station locations")
     return loc.with_columns(
-        pl.col("legacy_id", "name").str.strip_chars(),
+        pl.col("legacy_id").str.strip_chars(),
         pl.col("latitude", "longitude").str.strip_chars().cast(pl.Float64, strict=False),
     ).unique("legacy_id", keep="first")
 
@@ -264,7 +264,8 @@ def ingest_month(
     client: httpx.Client,
     mapping: pl.DataFrame,
     data_dir: Path = DATA_DIR,
-) -> dict:
+) -> tuple[dict, pl.DataFrame]:
+    """Ingest one month. Returns the report and that month's unmapped legacy stations."""
     contract = Contract.load("oslo_trips_legacy")
     raw_dir = data_dir / "raw" / "oslo_trips_legacy"
     zipped = _download(
@@ -303,11 +304,30 @@ def ingest_month(
         "starts_01_05_if_utc": round(closed["if_raw_were_utc"], 5),
     }
     log.info(report)
-    return report
+    return report, unmapped_stations(valid)
+
+
+def unmapped_stations(trips: pl.DataFrame) -> pl.DataFrame:
+    """Legacy station IDs with no new ID, by number of trip ends (start or end), most frequent first."""
+    ends = pl.concat(
+        [
+            trips.filter(pl.col(f"{side}_station_id").is_null()).select(
+                legacy_id=pl.col(f"{side}_station_legacy_id")
+            )
+            for side in ("start", "end")
+        ]
+    )
+    return (
+        ends.group_by("legacy_id").len("trip_ends").sort(["trip_ends", "legacy_id"], descending=[True, False])
+    )
 
 
 def summary_markdown(
-    reports: list[dict], ambiguous: list[str], mapping: pl.DataFrame, locations: pl.DataFrame | None
+    reports: list[dict],
+    ambiguous: list[str],
+    mapping: pl.DataFrame,
+    locations: pl.DataFrame | None,
+    unmapped: pl.DataFrame | None = None,
 ) -> str:
     lines = ["## Oslo legacy trips: real-data check", ""]
     if reports:
@@ -319,7 +339,13 @@ def summary_markdown(
         f"- Mapping rows (unambiguous legacy IDs): {mapping.height}",
         f"- Legacy IDs mapped to more than one new ID (dropped): {len(ambiguous)} {ambiguous[:20]}",
         f"- Legacy IDs mapped to no new ID: {mapping['new_id'].null_count()}",
+        f"- Sample mapping rows: {mapping.sort('legacy_id').head(5).rows()}",
     ]
+    if unmapped is not None and unmapped.height:
+        lines.append(
+            f"- Unmapped legacy stations seen in trips: {unmapped.height}; most frequent "
+            f"(legacy_id, trip ends): {unmapped.head(15).rows()}"
+        )
     if locations is not None:
         unlocated = mapping.join(locations, on="legacy_id", how="anti").height
         lines.append(
@@ -355,10 +381,19 @@ def main() -> None:
         except ValueError as exc:  # report, don't block trip ingestion on an unexpected locations header
             log.warning("locations file not used: %s", exc)
             locations = None
-        reports = [ingest_month(y, m, client, mapping) for y, m in months(args.start, args.end)]
+        results = [ingest_month(y, m, client, mapping) for y, m in months(args.start, args.end)]
 
+    reports = [r for r, _ in results]
+    unmapped = (
+        pl.concat([u for _, u in results])
+        .group_by("legacy_id")
+        .agg(pl.col("trip_ends").sum())
+        .sort(["trip_ends", "legacy_id"], descending=[True, False])
+    )
+    summary = summary_markdown(reports, ambiguous, mapping, locations, unmapped)
+    log.info(summary)
     if args.summary:
-        args.summary.write_text(summary_markdown(reports, ambiguous, mapping, locations))
+        args.summary.write_text(summary)
 
 
 if __name__ == "__main__":

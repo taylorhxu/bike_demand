@@ -17,6 +17,7 @@ from bikedemand.ingest.oslo_trips_legacy import (
     parse,
     read_zipped_csv,
     summary_markdown,
+    unmapped_stations,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -144,7 +145,8 @@ def test_reads_single_csv_from_zip():
 
 def test_locations_are_typed():
     loc = load_station_locations(LOCATIONS.read_bytes())
-    assert loc.columns == ["legacy_id", "name", "latitude", "longitude"]
+    # Matches the real file's header (legacy_id, latitude, longitude), seen in CI on 1 Nov 2026.
+    assert loc.columns == ["legacy_id", "latitude", "longitude"]
     assert loc["latitude"].dtype == pl.Float64
 
 
@@ -168,3 +170,8 @@ def test_summary_renders(split):
     )
     assert "| 2018-10 | 7 |" in md
     assert "mapped IDs without a location: 1" in md
+
+
+def test_unmapped_stations_counts_both_trip_ends(split):
+    valid, _ = split
+    assert unmapped_stations(valid).rows() == [("999", 1)]
