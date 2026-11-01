@@ -64,18 +64,40 @@ The publisher documents four variables per legacy trip: `start_station_id`, `sta
 `end_time`. There is no duration (it is derived) and no station name or coordinates on the trip; those
 come from `legacy_station_locations.csv`, and current-system IDs from `legacy_new_station_id_mapping.csv`.
 
-Not documented, and so not yet known (written 1 Nov 2026, before any real legacy file was read):
+### First real-data check (September–October 2018)
 
-- the exact CSV headers of the trip, location and mapping files (the parser accepts a few spellings
-  and fails listing the real headers otherwise);
-- the timestamp format and **time zone**. Timestamps with a UTC offset are used as given. Without one
-  they are read as Oslo local time, the fall-back hour is flagged (`flag_ambiguous_local_time`) and
-  spring-forward times are quarantined. The ingestion report gives the share of trips starting
-  01:00–05:00 local under that reading and under the alternative (raw values are UTC), as evidence
-  for which is right.
+Run in CI on 1 November 2026 (`Real-data check (Oslo legacy trips)` on PR #2). What the real files contain:
 
-The `Real-data check (Oslo legacy trips)` workflow prints the raw headers and sample rows of the real
-files and runs the parser on September–October 2018. Its results will be recorded here.
+- **Trip headers** are `Start station,Start time,End station,End time`, not the snake_case names on the
+  publisher's page. Each monthly zip holds one CSV, e.g. `trips-2018.10.1-2018.10.31.csv`.
+- **Timestamps carry an explicit offset**, e.g. `2018-10-01 05:59:42 +0200`, in 2016 as in 2018. So
+  the time zone is not a guess: offsets are used as given. Check: 0.002–0.004% of trips start
+  01:00–05:00 Oslo time under this reading, against 2.3–2.5% if the wall-clock values were UTC. The
+  first trips of the day start at about 06:00, consistent with the scheme opening at 06:00 then.
+- **Mapping file** header is `new_id,legacy_id`: 308 legacy IDs, all one-to-one, none empty.
+- **Locations file** has `legacy_id,latitude,longitude` (no names), 320 stations; at least one (292) has
+  coordinates 0,0.
+
+| Measure | 2018-09 | 2018-10 |
+|---|---|---|
+| Rows | 340,910 | 263,003 |
+| Valid | 340,851 | 262,533 |
+| Quarantined | 59 | 470 |
+| Trips under 60 s (kept, flagged) | 12,451 (3.7%) | 8,698 (3.3%) |
+| Trips touching a station with no mapping | 206,936 (61%) | 162,611 (62%) |
+| Legacy stations seen | 238 | 245 |
+
+Two findings to follow up, both open:
+
+1. **The mapping covers far fewer stations than the trips use.** 117 legacy station IDs in these two
+   months have no entry in the mapping, and they include the busiest ones (465, 292, 374, 405, ...). So
+   the operator's mapping alone cannot link most 2018 trips to today's stations. Possible reasons, not
+   yet tested: stations that closed before 2019, or late-legacy files already using another ID scheme.
+   Next check: whether the unmapped IDs appear in the locations file, so they can be matched to current
+   stations by coordinates.
+2. **Short trips are far more common than after 2019** (3–4% against 0.06%). Early 2016 rows show
+   same-station trips of 19–33 s, which look like re-docking rather than journeys. Not yet investigated;
+   they stay flagged. The reason for the 470 quarantined October rows has not been looked at either.
 
 ## London trips: notes to confirm on ingestion
 

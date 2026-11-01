@@ -34,6 +34,7 @@ rules:
       The publisher does not document the legacy time zone. Timestamps with a UTC offset are used as
       given; timestamps without one are read as Europe/Oslo wall-clock time. Each run reports the basis
       and a closed-hours check (share of starts 01:00-05:00 local under both readings).
+      Real files (checked 1 Nov 2026) carry explicit offsets, e.g. "2018-10-01 05:59:42 +0200".
   - name: ends_after_start
     description: >-
       duration is derived (ended_at - started_at); there is no published duration column. Rows with a

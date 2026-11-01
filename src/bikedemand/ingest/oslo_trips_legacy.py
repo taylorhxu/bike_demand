@@ -13,6 +13,9 @@ Two things are *not* documented and are handled defensively here:
    are read as Europe/Oslo wall-clock time (the operator's local time); the report records which basis
    was used, and `closed_hours_profile` lets the real-data check test that assumption.
 
+First real-data check (CI, 1 Nov 2026): headers are `Start station,Start time,End station,End time` and
+timestamps carry an offset (`2018-10-01 05:59:42 +0200`). See docs/data-sources.md.
+
 Output layout (git-ignored):
     data/raw/oslo_trips_legacy/{year}/{month}.csv.zip
     data/raw/oslo_trips_legacy/legacy_station_locations.csv

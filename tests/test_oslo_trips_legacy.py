@@ -175,3 +175,24 @@ def test_summary_renders(split):
 def test_unmapped_stations_counts_both_trip_ends(split):
     valid, _ = split
     assert unmapped_stations(valid).rows() == [("999", 1)]
+
+
+def test_real_legacy_file_format():
+    # First lines of the published 2018-10 file, as printed by the real-data check on 1 Nov 2026.
+    csv = (
+        b"Start station,Start time,End station,End time\n"
+        b"386,2018-10-01 05:59:42 +0200,278,2018-10-01 06:02:15 +0200\n"
+        b"239,2018-10-01 06:00:04 +0200,270,2018-10-01 06:06:29 +0200\n"
+    )
+    df, basis = parse(csv)
+    assert basis == "offset"
+    assert df["started_at"][0] == datetime(2018, 10, 1, 3, 59, 42, tzinfo=UTC)
+    assert df["duration"].to_list() == [153, 385]
+    assert df["start_station_legacy_id"].to_list() == ["386", "239"]
+
+
+def test_real_mapping_header_order():
+    # The real mapping file lists new_id first: "new_id,legacy_id".
+    mapping, ambiguous = load_station_mapping(b"new_id,legacy_id\n532,212\n823,134\n")
+    assert mapping.sort("legacy_id").rows() == [("134", "823"), ("212", "532")]
+    assert ambiguous == []
